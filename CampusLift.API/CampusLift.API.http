@@ -1,0 +1,6 @@
+@CampusLift.API_HostAddress = http://localhost:5056
+
+GET {{CampusLift.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
