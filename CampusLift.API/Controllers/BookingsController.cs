@@ -37,7 +37,16 @@ namespace CampusLift.API.Controllers
                 if (string.IsNullOrWhiteSpace(json) || json == "null")
                     return StatusCode(500, "Booking was created but could not be read.");
 
-                var booking = Newtonsoft.Json.JsonConvert.DeserializeObject<Booking>(json);
+                // Deserialize with snake_case → PascalCase mapping
+                var settings = new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
+                    {
+                        NamingStrategy = new Newtonsoft.Json.Serialization.SnakeCaseNamingStrategy()
+                    }
+                };
+                var booking = Newtonsoft.Json.JsonConvert.DeserializeObject<Booking>(json, settings);
+
                 if (booking == null)
                     return StatusCode(500, "Booking was created but could not be parsed.");
 
@@ -59,6 +68,9 @@ namespace CampusLift.API.Controllers
             catch (Exception ex)
             {
                 var msg = ex.Message ?? "";
+
+                if (msg.Contains("23505") || msg.Contains("duplicate key"))
+                    return Conflict("You already have an active booking on this trip.");
 
                 if (msg.Contains("Trip not found")) return NotFound("Trip not found.");
                 if (msg.Contains("not active")) return BadRequest("Trip is not active.");
