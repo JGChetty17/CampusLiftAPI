@@ -13,7 +13,7 @@ namespace CampusLift.API.Controllers
         public TripsController(Supabase.Client sb) : base(sb) { }
 
         // ----------------------------------------------------------------
-        // SEARCH — FIX 4: paginated
+        // SEARCH — paginated, driver+vehicle denormalized
         // ----------------------------------------------------------------
         [HttpGet]
         public async Task<IActionResult> Search(
@@ -51,9 +51,18 @@ namespace CampusLift.API.Controllers
                 .Range(offset, offset + limit - 1)
                 .Get();
 
+            var (users, vehicles) = await LoadLookups(tripsRes.Models);
+
             var enriched = new List<TripWithAvailability>();
             foreach (var t in tripsRes.Models)
-                enriched.Add(ToAvailability(t, await GetSeatsTaken(t.Id)));
+            {
+                var dto = ToAvailability(t, await GetSeatsTaken(t.Id));
+                dto.Driver = users.GetValueOrDefault(t.DriverId);
+                dto.Vehicle = t.VehicleId.HasValue
+                    ? vehicles.GetValueOrDefault(t.VehicleId.Value)
+                    : null;
+                enriched.Add(dto);
+            }
 
             return Ok(new
             {
@@ -65,7 +74,7 @@ namespace CampusLift.API.Controllers
         }
 
         // ----------------------------------------------------------------
-        // MY TRIPS — FIX 4: paginated
+        // MY TRIPS — paginated, driver+vehicle denormalized
         // ----------------------------------------------------------------
         [HttpGet("mine")]
         public async Task<IActionResult> MyTrips(
@@ -85,9 +94,18 @@ namespace CampusLift.API.Controllers
                 .Range(offset, offset + limit - 1)
                 .Get();
 
+            var (users, vehicles) = await LoadLookups(res.Models);
+
             var enriched = new List<TripWithAvailability>();
             foreach (var t in res.Models)
-                enriched.Add(ToAvailability(t, await GetSeatsTaken(t.Id)));
+            {
+                var dto = ToAvailability(t, await GetSeatsTaken(t.Id));
+                dto.Driver = users.GetValueOrDefault(t.DriverId);
+                dto.Vehicle = t.VehicleId.HasValue
+                    ? vehicles.GetValueOrDefault(t.VehicleId.Value)
+                    : null;
+                enriched.Add(dto);
+            }
 
             return Ok(new
             {
@@ -99,7 +117,7 @@ namespace CampusLift.API.Controllers
         }
 
         // ----------------------------------------------------------------
-        // GET BY ID
+        // GET BY ID — driver+vehicle denormalized
         // ----------------------------------------------------------------
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
@@ -115,7 +133,14 @@ namespace CampusLift.API.Controllers
             var trip = res.Models.FirstOrDefault();
             if (trip == null) return NotFound();
 
-            return Ok(ToAvailability(trip, await GetSeatsTaken(trip.Id)));
+            var dto = ToAvailability(trip, await GetSeatsTaken(trip.Id));
+            var (users, vehicles) = await LoadLookups(new[] { trip });
+            dto.Driver = users.GetValueOrDefault(trip.DriverId);
+            dto.Vehicle = trip.VehicleId.HasValue
+                ? vehicles.GetValueOrDefault(trip.VehicleId.Value)
+                : null;
+
+            return Ok(dto);
         }
 
         // ----------------------------------------------------------------
@@ -172,7 +197,15 @@ namespace CampusLift.API.Controllers
 
             var inserted = await Sb.From<Trip>().Insert(trip);
             var created = inserted.Models.First();
-            return Ok(ToAvailability(created, 0));
+
+            var dto = ToAvailability(created, 0);
+            var (users, vehicles) = await LoadLookups(new[] { created });
+            dto.Driver = users.GetValueOrDefault(created.DriverId);
+            dto.Vehicle = created.VehicleId.HasValue
+                ? vehicles.GetValueOrDefault(created.VehicleId.Value)
+                : null;
+
+            return Ok(dto);
         }
 
         // ----------------------------------------------------------------
@@ -245,11 +278,19 @@ namespace CampusLift.API.Controllers
 
             var updated = await Sb.From<Trip>().Update(trip);
             var outTrip = updated.Models.First();
-            return Ok(ToAvailability(outTrip, await GetSeatsTaken(outTrip.Id)));
+
+            var dto = ToAvailability(outTrip, await GetSeatsTaken(outTrip.Id));
+            var (users, vehicles) = await LoadLookups(new[] { outTrip });
+            dto.Driver = users.GetValueOrDefault(outTrip.DriverId);
+            dto.Vehicle = outTrip.VehicleId.HasValue
+                ? vehicles.GetValueOrDefault(outTrip.VehicleId.Value)
+                : null;
+
+            return Ok(dto);
         }
 
         // ----------------------------------------------------------------
-        // CANCEL — FIX 1: cascade to bookings  |  FIX 2: notify passengers
+        // CANCEL
         // ----------------------------------------------------------------
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(Guid id)
@@ -348,6 +389,61 @@ namespace CampusLift.API.Controllers
                     "The trip you booked has been cancelled by the driver.");
             }
             return count;
+        }
+
+        /// <summary>
+        /// Batch-loads the drivers and vehicles referenced by the given trips
+        /// so ride cards can render name/picture/make/model/plate without
+        /// N+1 round-trips.
+        /// </summary>
+        private async Task<(Dictionary<Guid, PublicUserSummary> Users,
+                            Dictionary<Guid, PublicVehicleSummary> Vehicles)>
+            LoadLookups(IEnumerable<Trip> trips)
+        {
+            var tripList = trips.ToList();
+
+            var driverIds = tripList.Select(t => t.DriverId).Distinct().ToList();
+            var vehicleIds = tripList
+                .Where(t => t.VehicleId.HasValue)
+                .Select(t => t.VehicleId!.Value)
+                .Distinct()
+                .ToList();
+
+            var users = new Dictionary<Guid, PublicUserSummary>();
+            var vehicles = new Dictionary<Guid, PublicVehicleSummary>();
+
+            foreach (var id in driverIds)
+            {
+                var r = await Sb.From<User>().Where(u => u.Id == id).Limit(1).Get();
+                var u = r.Models.FirstOrDefault();
+                if (u != null)
+                    users[u.Id] = new PublicUserSummary
+                    {
+                        Id = u.Id,
+                        Name = u.Name,
+                        Surname = u.Surname,
+                        ProfilePicture = u.ProfilePicture
+                    };
+            }
+
+            foreach (var id in vehicleIds)
+            {
+                var r = await Sb.From<Vehicle>().Where(v => v.Id == id).Limit(1).Get();
+                var v = r.Models.FirstOrDefault();
+                if (v != null)
+                    vehicles[v.Id] = new PublicVehicleSummary
+                    {
+                        Id = v.Id,
+                        Make = v.Make,
+                        Model = v.Model,
+                        Year = v.Year,
+                        Color = v.Color,
+                        LicensePlate = v.LicensePlate,
+                        Seats = v.Seats
+                    };
+            }
+
+            return (users, vehicles);
         }
 
         private static TripWithAvailability ToAvailability(Trip t, int taken) => new()

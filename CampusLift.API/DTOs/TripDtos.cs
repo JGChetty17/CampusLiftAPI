@@ -31,7 +31,8 @@
 
     /// <summary>
     /// Trip plus computed fields for the client:
-    /// SeatsTaken (sum of active bookings), SeatsRemaining.
+    /// SeatsTaken (sum of active bookings), SeatsRemaining,
+    /// plus denormalized Driver + Vehicle for ride cards.
     /// </summary>
     public class TripWithAvailability
     {
@@ -54,5 +55,9 @@
 
         public int SeatsTaken { get; set; }
         public int SeatsRemaining { get; set; }
+
+        // Denormalized display info
+        public PublicUserSummary? Driver { get; set; }
+        public PublicVehicleSummary? Vehicle { get; set; }
     }
 }
