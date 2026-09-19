@@ -37,7 +37,6 @@ namespace CampusLift.API.Controllers
                 if (string.IsNullOrWhiteSpace(json) || json == "null")
                     return StatusCode(500, "Booking was created but could not be read.");
 
-                // Deserialize with snake_case → PascalCase mapping
                 var settings = new Newtonsoft.Json.JsonSerializerSettings
                 {
                     ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -50,7 +49,6 @@ namespace CampusLift.API.Controllers
                 if (booking == null)
                     return StatusCode(500, "Booking was created but could not be parsed.");
 
-                // Notify the driver
                 var tripRes = await Sb.From<Trip>()
                     .Where(t => t.Id == req.TripId).Limit(1).Get();
                 var trip = tripRes.Models.FirstOrDefault();
@@ -85,7 +83,7 @@ namespace CampusLift.API.Controllers
         }
 
         // ----------------------------------------------------------------
-        // MY BOOKINGS (as passenger)
+        // MY BOOKINGS (as passenger) — trip summary inline
         // ----------------------------------------------------------------
         [HttpGet("mine")]
         public async Task<IActionResult> MyBookings()
@@ -98,15 +96,12 @@ namespace CampusLift.API.Controllers
                 .Order(b => b.BookingTime, Constants.Ordering.Descending)
                 .Get();
 
-            var enriched = new List<BookingWithTrip>();
-            foreach (var b in res.Models)
-                enriched.Add(await EnrichWithTrip(b));
-
+            var enriched = await EnrichWithTrips(res.Models, includePassenger: false);
             return Ok(enriched);
         }
 
         // ----------------------------------------------------------------
-        // BOOKINGS FOR A TRIP (driver view)
+        // BOOKINGS FOR A TRIP (driver view) — passenger name/picture inline
         // ----------------------------------------------------------------
         [HttpGet("trip/{tripId:guid}")]
         public async Task<IActionResult> ForTrip(Guid tripId)
@@ -127,10 +122,7 @@ namespace CampusLift.API.Controllers
                 .Order(b => b.BookingTime, Constants.Ordering.Ascending)
                 .Get();
 
-            var enriched = new List<BookingWithTrip>();
-            foreach (var b in res.Models)
-                enriched.Add(await EnrichWithTrip(b));
-
+            var enriched = await EnrichWithTrips(res.Models, includePassenger: true);
             return Ok(enriched);
         }
 
@@ -282,31 +274,71 @@ namespace CampusLift.API.Controllers
         // ----------------------------------------------------------------
         // HELPERS
         // ----------------------------------------------------------------
-        private async Task<BookingWithTrip> EnrichWithTrip(Booking b)
+
+        /// <summary>
+        /// Batch-enriches bookings with their trip summary, and optionally
+        /// with the passenger's public profile (for the driver's view).
+        /// </summary>
+        private async Task<List<BookingWithTrip>> EnrichWithTrips(
+            List<Booking> bookings,
+            bool includePassenger)
         {
-            var tripRes = await Sb.From<Trip>()
-                .Where(t => t.Id == b.TripId)
-                .Limit(1)
-                .Get();
+            if (bookings.Count == 0) return new();
 
-            var trip = tripRes.Models.FirstOrDefault();
+            var tripIds = bookings.Select(b => b.TripId).Distinct().ToList();
+            var passengerIds = includePassenger
+                ? bookings.Select(b => b.PassengerId).Distinct().ToList()
+                : new List<Guid>();
 
-            return new BookingWithTrip
+            var tripsById = new Dictionary<Guid, Trip>();
+            var passengersById = new Dictionary<Guid, PublicUserSummary>();
+
+            foreach (var id in tripIds)
             {
-                Id = b.Id,
-                TripId = b.TripId,
-                PassengerId = b.PassengerId,
-                SeatsRequested = b.SeatsRequested,
-                Approval = b.Approval,
-                ApprovedTime = b.ApprovedTime,
-                BookingTime = b.BookingTime,
-                CancellationTime = b.CancellationTime,
-                PickupConfirmed = b.PickupConfirmed,
-                FromLocation = trip?.FromLocation ?? "",
-                ToLocation = trip?.ToLocation ?? "",
-                EventTime = trip?.EventTime ?? default,
-                PricePerSeat = trip?.PricePerSeat ?? 0
-            };
+                var r = await Sb.From<Trip>().Where(t => t.Id == id).Limit(1).Get();
+                var t = r.Models.FirstOrDefault();
+                if (t != null) tripsById[t.Id] = t;
+            }
+
+            foreach (var id in passengerIds)
+            {
+                var r = await Sb.From<User>().Where(u => u.Id == id).Limit(1).Get();
+                var u = r.Models.FirstOrDefault();
+                if (u != null)
+                    passengersById[u.Id] = new PublicUserSummary
+                    {
+                        Id = u.Id,
+                        Name = u.Name,
+                        Surname = u.Surname,
+                        ProfilePicture = u.ProfilePicture
+                    };
+            }
+
+            var result = new List<BookingWithTrip>();
+            foreach (var b in bookings)
+            {
+                tripsById.TryGetValue(b.TripId, out var trip);
+                result.Add(new BookingWithTrip
+                {
+                    Id = b.Id,
+                    TripId = b.TripId,
+                    PassengerId = b.PassengerId,
+                    SeatsRequested = b.SeatsRequested,
+                    Approval = b.Approval,
+                    ApprovedTime = b.ApprovedTime,
+                    BookingTime = b.BookingTime,
+                    CancellationTime = b.CancellationTime,
+                    PickupConfirmed = b.PickupConfirmed,
+                    FromLocation = trip?.FromLocation ?? "",
+                    ToLocation = trip?.ToLocation ?? "",
+                    EventTime = trip?.EventTime ?? default,
+                    PricePerSeat = trip?.PricePerSeat ?? 0,
+                    Passenger = includePassenger
+                        ? passengersById.GetValueOrDefault(b.PassengerId)
+                        : null
+                });
+            }
+            return result;
         }
     }
 }

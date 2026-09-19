@@ -26,5 +26,8 @@
         public string ToLocation { get; set; } = "";
         public DateTime EventTime { get; set; }
         public decimal PricePerSeat { get; set; }
+
+        // Populated only on the driver's ForTrip view
+        public PublicUserSummary? Passenger { get; set; }
     }
 }
