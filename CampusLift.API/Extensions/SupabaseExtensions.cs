@@ -5,10 +5,7 @@ namespace CampusLift.API.Extensions
 {
     public static class SupabaseExtensions
     {
-        /// <summary>
-        /// Looks up the internal Supabase user by the Firebase UID header.
-        /// Returns null if not found.
-        /// </summary>
+        // Looks up the internal Supabase user by the Firebase UID header.Returns null if not found.
         public static async Task<User?> GetByFirebaseUidAsync(
             this Supabase.Client sb, string? firebaseUid)
         {
@@ -22,10 +19,7 @@ namespace CampusLift.API.Extensions
             return res.Models.FirstOrDefault();
         }
 
-        /// <summary>
-        /// Pulls the X-Firebase-Uid header and resolves the user.
-        /// Returns null if the header is missing or the user doesn't exist.
-        /// </summary>
+        // Pulls the X-Firebase-Uid header and resolves the user.Returns null if the header is missing or the user doesn't exist.
         public static async Task<User?> ResolveUserAsync(
             this Supabase.Client sb, HttpContext ctx)
         {

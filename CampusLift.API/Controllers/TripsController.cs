@@ -12,9 +12,7 @@ namespace CampusLift.API.Controllers
     {
         public TripsController(Supabase.Client sb) : base(sb) { }
 
-        // ----------------------------------------------------------------
         // SEARCH — paginated, driver+vehicle denormalized
-        // ----------------------------------------------------------------
         [HttpGet]
         public async Task<IActionResult> Search(
             [FromQuery] string? from,
@@ -73,9 +71,7 @@ namespace CampusLift.API.Controllers
             });
         }
 
-        // ----------------------------------------------------------------
         // MY TRIPS — paginated, driver+vehicle denormalized
-        // ----------------------------------------------------------------
         [HttpGet("mine")]
         public async Task<IActionResult> MyTrips(
             [FromQuery] int limit = 20,
@@ -116,9 +112,7 @@ namespace CampusLift.API.Controllers
             });
         }
 
-        // ----------------------------------------------------------------
-        // GET BY ID — driver+vehicle denormalized
-        // ----------------------------------------------------------------
+        // GET BY ID — driver & vehicle denormalized
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -143,9 +137,7 @@ namespace CampusLift.API.Controllers
             return Ok(dto);
         }
 
-        // ----------------------------------------------------------------
         // CREATE
-        // ----------------------------------------------------------------
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateTripRequest req)
         {
@@ -208,9 +200,7 @@ namespace CampusLift.API.Controllers
             return Ok(dto);
         }
 
-        // ----------------------------------------------------------------
         // UPDATE
-        // ----------------------------------------------------------------
         [HttpPatch("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTripRequest req)
         {
@@ -289,9 +279,7 @@ namespace CampusLift.API.Controllers
             return Ok(dto);
         }
 
-        // ----------------------------------------------------------------
         // CANCEL
-        // ----------------------------------------------------------------
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(Guid id)
         {
@@ -322,9 +310,7 @@ namespace CampusLift.API.Controllers
             });
         }
 
-        // ----------------------------------------------------------------
         // COMPLETE
-        // ----------------------------------------------------------------
         [HttpPost("{id:guid}/complete")]
         public async Task<IActionResult> Complete(Guid id)
         {
@@ -351,10 +337,6 @@ namespace CampusLift.API.Controllers
 
             return Ok(new { message = "Trip completed.", tripId = trip.Id });
         }
-
-        // ----------------------------------------------------------------
-        // HELPERS
-        // ----------------------------------------------------------------
 
         private async Task<int> GetSeatsTaken(Guid tripId)
         {
@@ -391,11 +373,6 @@ namespace CampusLift.API.Controllers
             return count;
         }
 
-        /// <summary>
-        /// Batch-loads the drivers and vehicles referenced by the given trips
-        /// so ride cards can render name/picture/make/model/plate without
-        /// N+1 round-trips.
-        /// </summary>
         private async Task<(Dictionary<Guid, PublicUserSummary> Users,
                             Dictionary<Guid, PublicVehicleSummary> Vehicles)>
             LoadLookups(IEnumerable<Trip> trips)

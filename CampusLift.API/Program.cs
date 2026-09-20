@@ -8,7 +8,7 @@ namespace CampusLift.API
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Controllers + Swagger
+            // Controllers and Swagger
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();

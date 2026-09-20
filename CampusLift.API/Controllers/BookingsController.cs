@@ -12,9 +12,7 @@ namespace CampusLift.API.Controllers
     {
         public BookingsController(Supabase.Client sb) : base(sb) { }
 
-        // ----------------------------------------------------------------
         // CREATE BOOKING (passenger) — atomic via book_seat RPC
-        // ----------------------------------------------------------------
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateBookingRequest req)
         {
@@ -82,9 +80,7 @@ namespace CampusLift.API.Controllers
             }
         }
 
-        // ----------------------------------------------------------------
         // MY BOOKINGS (as passenger) — trip summary inline
-        // ----------------------------------------------------------------
         [HttpGet("mine")]
         public async Task<IActionResult> MyBookings()
         {
@@ -100,9 +96,7 @@ namespace CampusLift.API.Controllers
             return Ok(enriched);
         }
 
-        // ----------------------------------------------------------------
         // BOOKINGS FOR A TRIP (driver view) — passenger name/picture inline
-        // ----------------------------------------------------------------
         [HttpGet("trip/{tripId:guid}")]
         public async Task<IActionResult> ForTrip(Guid tripId)
         {
@@ -126,9 +120,7 @@ namespace CampusLift.API.Controllers
             return Ok(enriched);
         }
 
-        // ----------------------------------------------------------------
         // APPROVE / REJECT (driver only)
-        // ----------------------------------------------------------------
         [HttpPost("{id:guid}/approve")]
         public async Task<IActionResult> Approve(Guid id, [FromBody] ApproveBookingRequest req)
         {
@@ -170,9 +162,7 @@ namespace CampusLift.API.Controllers
             return Ok(updated.Models.First());
         }
 
-        // ----------------------------------------------------------------
         // CANCEL (passenger or driver)
-        // ----------------------------------------------------------------
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(Guid id)
         {
@@ -230,9 +220,7 @@ namespace CampusLift.API.Controllers
             return Ok(new { message = "Booking cancelled.", bookingId = booking.Id });
         }
 
-        // ----------------------------------------------------------------
         // PICKUP CONFIRM (passenger only)
-        // ----------------------------------------------------------------
         [HttpPost("{id:guid}/pickup-confirm")]
         public async Task<IActionResult> ConfirmPickup(Guid id)
         {
@@ -271,14 +259,8 @@ namespace CampusLift.API.Controllers
             return Ok(new { message = "Pickup confirmed.", bookingId = booking.Id });
         }
 
-        // ----------------------------------------------------------------
-        // HELPERS
-        // ----------------------------------------------------------------
 
-        /// <summary>
-        /// Batch-enriches bookings with their trip summary, and optionally
-        /// with the passenger's public profile (for the driver's view).
-        /// </summary>
+        // Batch-enriches bookings with their trip summary, and optionally with the passenger's public profile.
         private async Task<List<BookingWithTrip>> EnrichWithTrips(
             List<Booking> bookings,
             bool includePassenger)

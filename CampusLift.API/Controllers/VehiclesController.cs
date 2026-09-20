@@ -12,9 +12,7 @@ namespace CampusLift.API.Controllers
     {
         public VehiclesController(Supabase.Client sb) : base(sb) { }
 
-        // ----------------------------------------------------------------
         // LIST MY VEHICLES
-        // ----------------------------------------------------------------
         [HttpGet]
         public async Task<IActionResult> Mine()
         {
@@ -29,9 +27,7 @@ namespace CampusLift.API.Controllers
             return Ok(res.Models);
         }
 
-        // ----------------------------------------------------------------
         // GET BY ID
-        // ----------------------------------------------------------------
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -48,9 +44,7 @@ namespace CampusLift.API.Controllers
             return Ok(vehicle);
         }
 
-        // ----------------------------------------------------------------
         // CREATE
-        // ----------------------------------------------------------------
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateVehicleRequest req)
         {
@@ -82,9 +76,7 @@ namespace CampusLift.API.Controllers
             return Ok(inserted.Models.First());
         }
 
-        // ----------------------------------------------------------------
         // UPDATE
-        // ----------------------------------------------------------------
         [HttpPatch("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVehicleRequest req)
         {
@@ -116,9 +108,7 @@ namespace CampusLift.API.Controllers
             return Ok(updated.Models.First());
         }
 
-        // ----------------------------------------------------------------
-        // DELETE — FIX 8: refuse if the vehicle is on an active trip
-        // ----------------------------------------------------------------
+        // DELETE — refuse if the vehicle is on an active trip
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {

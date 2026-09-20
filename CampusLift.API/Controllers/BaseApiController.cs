@@ -15,19 +15,11 @@ namespace CampusLift.API.Controllers
             Sb = sb;
         }
 
-        /// <summary>
-        /// Firebase UID of the current user. Sent by the Android app
-        /// as a header on every request.
-        /// </summary>
+        // Firebase UID of the current user sent by the Android app as a header on every request.
         [FromHeader(Name = "X-Firebase-Uid")]
         public string? FirebaseUid { get; set; }
 
-        /// <summary>
-        /// Resolves the current user from the Firebase UID header.
-        /// Returns null if missing or unknown.
-        /// This is the single chokepoint we'll hook Firebase token
-        /// verification into later.
-        /// </summary>
+        // Resolves the current user from the Firebase UID header.Returns null if missing or unknown.
         protected Task<User?> CurrentUser()
             => Sb.ResolveUserAsync(HttpContext);
     }

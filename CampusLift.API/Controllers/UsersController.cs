@@ -11,9 +11,7 @@ namespace CampusLift.API.Controllers
     {
         public UsersController(Supabase.Client sb) : base(sb) { }
 
-        // ----------------------------------------------------------------
         // SYNC — called by Android after Firebase login
-        // ----------------------------------------------------------------
         [HttpPost("sync")]
         public async Task<IActionResult> Sync([FromBody] SyncUserRequest req)
         {
@@ -39,9 +37,6 @@ namespace CampusLift.API.Controllers
             return Ok(inserted.Models.First());
         }
 
-        // ----------------------------------------------------------------
-        // ME
-        // ----------------------------------------------------------------
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
@@ -50,9 +45,7 @@ namespace CampusLift.API.Controllers
             return Ok(user);
         }
 
-        // ----------------------------------------------------------------
         // UPDATE PROFILE
-        // ----------------------------------------------------------------
         [HttpPatch("me")]
         public async Task<IActionResult> Update([FromBody] UpdateUserRequest req)
         {
