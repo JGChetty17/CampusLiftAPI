@@ -29,11 +29,7 @@
         bool? IsActive
     );
 
-    /// <summary>
-    /// Trip plus computed fields for the client:
-    /// SeatsTaken (sum of active bookings), SeatsRemaining,
-    /// plus denormalized Driver + Vehicle for ride cards.
-    /// </summary>
+    // Trip plus computed fields for the client:SeatsTaken (sum of active bookings), SeatsRemaining,plus denormalized Driver + Vehicle for ride cards.
     public class TripWithAvailability
     {
         public Guid Id { get; set; }

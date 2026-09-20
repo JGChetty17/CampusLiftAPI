@@ -12,9 +12,7 @@ namespace CampusLift.API.Controllers
     {
         public NotificationsController(Supabase.Client sb) : base(sb) { }
 
-        // ----------------------------------------------------------------
         // LIST — my notifications, newest first, paginated
-        // ----------------------------------------------------------------
         [HttpGet]
         public async Task<IActionResult> Mine(
             [FromQuery] bool? unreadOnly,
@@ -48,9 +46,7 @@ namespace CampusLift.API.Controllers
             });
         }
 
-        // ----------------------------------------------------------------
         // UNREAD COUNT
-        // ----------------------------------------------------------------
         [HttpGet("unread-count")]
         public async Task<IActionResult> UnreadCount()
         {
@@ -64,9 +60,7 @@ namespace CampusLift.API.Controllers
             return Ok(new { unread = res.Models.Count });
         }
 
-        // ----------------------------------------------------------------
         // MARK ONE AS READ
-        // ----------------------------------------------------------------
         [HttpPatch("{id:guid}")]
         public async Task<IActionResult> MarkRead(Guid id, [FromBody] UpdateNotificationRequest req)
         {
@@ -86,9 +80,7 @@ namespace CampusLift.API.Controllers
             return Ok(updated.Models.First());
         }
 
-        // ----------------------------------------------------------------
         // MARK ALL AS READ
-        // ----------------------------------------------------------------
         [HttpPost("mark-all-read")]
         public async Task<IActionResult> MarkAllRead()
         {
@@ -110,9 +102,7 @@ namespace CampusLift.API.Controllers
             return Ok(new { markedRead = count });
         }
 
-        // ----------------------------------------------------------------
         // DELETE
-        // ----------------------------------------------------------------
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {

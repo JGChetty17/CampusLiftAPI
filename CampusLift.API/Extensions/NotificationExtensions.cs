@@ -5,15 +5,11 @@ namespace CampusLift.API.Extensions
 {
     public static class NotificationExtensions
     {
-        /// <summary>
-        /// Writes a row to the `notifications` table.
-        /// Failures are swallowed — never break the caller because
-        /// a notification insert died.
-        /// </summary>
+        // Writes a row to the notifications table.Failures are swallowed never break the caller because a notification insert died.
         public static async Task CreateNotification(
             this Supabase.Client sb,
             Guid userId,
-            string type,       // "booking" | "message" | "rating" | "system"
+            string type,      
             string title,
             string message)
         {
