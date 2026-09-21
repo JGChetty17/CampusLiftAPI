@@ -39,7 +39,8 @@ namespace CampusLift.API.Controllers
 
             if (date.HasValue)
             {
-                var start = date.Value.Date.ToUniversalTime();
+                // Normalise the incoming date to UTC, then build a 24h window.
+                var start = AsUtc(date.Value.Date);
                 var end = start.AddDays(1);
                 q = q.Where(t => t.EventTime >= start && t.EventTime < end);
             }
@@ -148,7 +149,10 @@ namespace CampusLift.API.Controllers
                 string.IsNullOrWhiteSpace(req.ToLocation))
                 return BadRequest("FromLocation and ToLocation are required.");
 
-            if (req.EventTime <= DateTime.UtcNow)
+            // Normalise once, use everywhere below.
+            var eventTimeUtc = AsUtc(req.EventTime);
+
+            if (eventTimeUtc <= DateTime.UtcNow)
                 return BadRequest("EventTime must be in the future.");
 
             if (req.TotalSeats < 1 || req.TotalSeats > 20)
@@ -178,7 +182,7 @@ namespace CampusLift.API.Controllers
                 FromLng = req.FromLng,
                 ToLat = req.ToLat,
                 ToLng = req.ToLng,
-                EventTime = req.EventTime,
+                EventTime = eventTimeUtc,
                 PricePerSeat = req.PricePerSeat,
                 TotalSeats = req.TotalSeats,
                 Description = req.Description,
@@ -240,9 +244,10 @@ namespace CampusLift.API.Controllers
 
             if (req.EventTime.HasValue)
             {
-                if (req.EventTime.Value <= DateTime.UtcNow)
+                var eventTimeUtc = AsUtc(req.EventTime.Value);
+                if (eventTimeUtc <= DateTime.UtcNow)
                     return BadRequest("EventTime must be in the future.");
-                trip.EventTime = req.EventTime.Value;
+                trip.EventTime = eventTimeUtc;
             }
 
             if (req.PricePerSeat.HasValue)
@@ -328,7 +333,13 @@ namespace CampusLift.API.Controllers
             if (trip.IsComplete)
                 return BadRequest("Trip already completed.");
 
-            if (trip.EventTime > DateTime.UtcNow)
+            // --- TEMP DIAGNOSTIC — remove after confirming the fix ---
+            Console.WriteLine(
+                $"[Complete] raw EventTime={trip.EventTime:O} Kind={trip.EventTime.Kind} | " +
+                $"normalised={AsUtc(trip.EventTime):O} | UtcNow={DateTime.UtcNow:O}");
+            // ---------------------------------------------------------
+
+            if (AsUtc(trip.EventTime) > DateTime.UtcNow)
                 return BadRequest("Cannot complete a trip before its departure time.");
 
             trip.IsComplete = true;
@@ -443,6 +454,19 @@ namespace CampusLift.API.Controllers
             CreatedAt = t.CreatedAt,
             SeatsTaken = taken,
             SeatsRemaining = Math.Max(0, t.TotalSeats - taken)
+        };
+
+        // --- Timezone normalisation helper ---------------------------------
+        // The Supabase/Newtonsoft read path drops the offset from timestamptz
+        // values and returns wall-clock DateTime with Kind=Unspecified.
+        // Postgres stores timestamptz in UTC, so an Unspecified value from
+        // that path is already UTC wall-clock — we just need to tag it.
+        private static DateTime AsUtc(DateTime dt) => dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
         };
     }
 }
