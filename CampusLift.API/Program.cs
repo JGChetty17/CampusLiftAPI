@@ -48,4 +48,6 @@ namespace CampusLift.API
             app.Run();
         }
     }
+    
 }
+public partial class Program { }
