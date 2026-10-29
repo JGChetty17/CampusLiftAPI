@@ -1,4 +1,34 @@
-﻿using CampusLift.API.DTOs;
+﻿// =============================================================================
+// BookingsController
+// -----------------------------------------------------------------------------
+// Handles all booking-related endpoints for the CampusLift API:
+//   - Create booking (atomic via Supabase `book_seat` RPC)
+//   - List bookings for the current passenger ("mine")
+//   - List bookings for a given trip (driver view)
+//   - Approve / reject a booking (driver only)
+//   - Cancel a booking (passenger or driver)
+//   - Confirm pickup (passenger only)
+//
+// References:
+//   [1] Supabase C# API Reference — Introduction
+//       https://supabase.com/docs/reference/csharp/introduction
+//   [2] Supabase C# API Reference — RPC
+//       https://supabase.com/docs/reference/csharp/rpc
+//   [3] Supabase C# SDK — GitHub Repository
+//       https://github.com/supabase-community/supabase-csharp
+//   [4] Supabase.Postgrest NuGet Package
+//       https://www.nuget.org/packages/Supabase.Postgrest
+//   [5] Microsoft Learn — Binding source parameter inference
+//       https://learn.microsoft.com/aspnet/core/mvc/models/model-binding
+//   [6] Microsoft Learn — Create web APIs with ASP.NET Core
+//       https://learn.microsoft.com/aspnet/core/web-api/
+//   [7] Newtonsoft.Json — Serialization Settings
+//       https://www.newtonsoft.com/json/help/html/SerializationSettings.htm
+//
+// Author: CampusLift API
+// =============================================================================
+
+using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -7,12 +37,14 @@ using Supabase.Postgrest;
 
 namespace CampusLift.API.Controllers
 {
+    // See [6]: attribute routing for all endpoints in this controller.
     [Route("api/bookings")]
     public class BookingsController : BaseApiController
     {
         public BookingsController(Supabase.Client sb) : base(sb) { }
 
         // CREATE BOOKING (passenger) — atomic via book_seat RPC
+        // See [5]: [FromBody] binds the JSON payload to CreateBookingRequest.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateBookingRequest req)
         {
@@ -24,6 +56,8 @@ namespace CampusLift.API.Controllers
 
             try
             {
+                // See [2] and [3]: supabase.Rpc("book_seat", params) invokes the
+                // Postgres function atomically.
                 var rpc = await Sb.Rpc("book_seat", new
                 {
                     p_trip_id = req.TripId,
@@ -35,6 +69,7 @@ namespace CampusLift.API.Controllers
                 if (string.IsNullOrWhiteSpace(json) || json == "null")
                     return StatusCode(500, "Booking was created but could not be read.");
 
+                // See [7]: RPC returns snake_case JSON; deserialize with SnakeCaseNamingStrategy.
                 var settings = new Newtonsoft.Json.JsonSerializerSettings
                 {
                     ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -47,6 +82,7 @@ namespace CampusLift.API.Controllers
                 if (booking == null)
                     return StatusCode(500, "Booking was created but could not be parsed.");
 
+                // See [1]: From<Trip>().Where(...).Limit(1).Get() query chain.
                 var tripRes = await Sb.From<Trip>()
                     .Where(t => t.Id == req.TripId).Limit(1).Get();
                 var trip = tripRes.Models.FirstOrDefault();
@@ -87,6 +123,7 @@ namespace CampusLift.API.Controllers
             var user = await CurrentUser();
             if (user == null) return Unauthorized("Unknown Firebase UID.");
 
+            // See [1]: .Order(b => b.BookingTime, Constants.Ordering.Descending).
             var res = await Sb.From<Booking>()
                 .Where(b => b.PassengerId == user.Id)
                 .Order(b => b.BookingTime, Constants.Ordering.Descending)
@@ -149,6 +186,7 @@ namespace CampusLift.API.Controllers
             booking.Approval = req.Approve ? "approved" : "rejected";
             booking.ApprovedTime = DateTime.UtcNow;
 
+            // See [1]: .Update(entity) writes the modified row back.
             var updated = await Sb.From<Booking>().Update(booking);
 
             await Sb.CreateNotification(
@@ -261,6 +299,8 @@ namespace CampusLift.API.Controllers
 
 
         // Batch-enriches bookings with their trip summary, and optionally with the passenger's public profile.
+        // See [1]: uses From<T>().Where(...).Limit(1).Get() for each lookup.
+        // See [4]: relies on [Table]/[Column] attributes on Booking, Trip, User.
         private async Task<List<BookingWithTrip>> EnrichWithTrips(
             List<Booking> bookings,
             bool includePassenger)
