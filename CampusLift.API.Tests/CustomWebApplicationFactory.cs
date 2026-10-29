@@ -1,27 +1,28 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-
-namespace CampusLift.API.Tests;
-
+using Microsoft.Extensions.Configuration.Json;              // ← AddJsonFile
+using Microsoft.Extensions.Configuration.EnvironmentVariables; // ← AddEnvironmentVariables
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
-        // Point the content root at the test project's output folder
-        // so appsettings.Testing.json resolves correctly.
         var testProjectDir = AppContext.BaseDirectory;
         builder.UseContentRoot(testProjectDir);
 
+        // Clear existing config and rebuild in a known order
         builder.ConfigureAppConfiguration((ctx, config) =>
         {
+            config.Sources.Clear();                                    // ← NEW: start clean
+
             config.AddJsonFile(
                 Path.Combine(testProjectDir, "appsettings.Testing.json"),
-                optional: false,
+                optional: true,                                        // ← CHANGED: true (so missing file doesn't crash)
                 reloadOnChange: false);
-            config.AddEnvironmentVariables();
+
+            config.AddEnvironmentVariables();                          // ← LAST = wins
         });
     }
 }

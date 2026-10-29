@@ -1,4 +1,33 @@
-﻿using CampusLift.API.DTOs;
+﻿// =============================================================================
+// TripsController
+// -----------------------------------------------------------------------------
+// Handles all trip-related endpoints for the CampusLift API:
+//   - Search trips (paginated, driver + vehicle denormalized)
+//   - List my trips as driver (paginated)
+//   - Get a single trip by id
+//   - Create a trip
+//   - Update a trip
+//   - Cancel a trip (also cancels active bookings)
+//   - Complete a trip
+//
+// References:
+//   [1] Supabase C# API Reference — Introduction
+//       https://supabase.com/docs/reference/csharp/introduction
+//   [2] Supabase C# API Reference — Filters
+//       https://supabase.com/docs/reference/csharp/using-filters
+//   [3] Supabase C# SDK — GitHub Repository
+//       https://github.com/supabase-community/supabase-csharp
+//   [4] Microsoft Learn — Create web APIs with ASP.NET Core
+//       https://learn.microsoft.com/aspnet/core/web-api/
+//   [5] Microsoft Learn — Binding source parameter inference
+//       https://learn.microsoft.com/aspnet/core/mvc/models/model-binding
+//   [6] Microsoft Learn — DateTime.SpecifyKind
+//       https://learn.microsoft.com/dotnet/api/system.datetime.specifykind
+//
+// Author: CampusLift API
+// =============================================================================
+
+using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -7,12 +36,14 @@ using Supabase.Postgrest;
 
 namespace CampusLift.API.Controllers
 {
+    // See [4]: attribute routing for all endpoints in this controller.
     [Route("api/trips")]
     public class TripsController : BaseApiController
     {
         public TripsController(Supabase.Client sb) : base(sb) { }
 
         // SEARCH — paginated, driver+vehicle denormalized
+        // See [5]: [FromQuery] binds from/to/date/limit/offset.
         [HttpGet]
         public async Task<IActionResult> Search(
             [FromQuery] string? from,
@@ -28,9 +59,11 @@ namespace CampusLift.API.Controllers
             if (limit > 100) limit = 100;
             if (offset < 0) offset = 0;
 
+            // See [1]: base SELECT with two WHERE predicates combined by AND.
             var q = Sb.From<Trip>()
                 .Where(t => t.IsActive == true && t.IsComplete == false);
 
+            // See [2]: .Filter("column", Operator.ILike, pattern) → case-insensitive match.
             if (!string.IsNullOrWhiteSpace(from))
                 q = q.Filter("from_location", Constants.Operator.ILike, $"%{from.Trim()}%");
 
@@ -45,6 +78,7 @@ namespace CampusLift.API.Controllers
                 q = q.Where(t => t.EventTime >= start && t.EventTime < end);
             }
 
+            // See [1]: .Order() then .Range() → ORDER BY ... LIMIT ... OFFSET ...
             var tripsRes = await q
                 .Order(t => t.EventTime, Constants.Ordering.Ascending)
                 .Range(offset, offset + limit - 1)
@@ -85,6 +119,7 @@ namespace CampusLift.API.Controllers
             if (limit > 100) limit = 100;
             if (offset < 0) offset = 0;
 
+            // See [1]: filter by driver_id, sort desc, paginate with Range.
             var res = await Sb.From<Trip>()
                 .Where(t => t.DriverId == user.Id)
                 .Order(t => t.EventTime, Constants.Ordering.Descending)
@@ -114,6 +149,7 @@ namespace CampusLift.API.Controllers
         }
 
         // GET BY ID — driver & vehicle denormalized
+        // See [4]: route constraint {id:guid} restricts the segment to GUIDs.
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -139,6 +175,7 @@ namespace CampusLift.API.Controllers
         }
 
         // CREATE
+        // See [5]: [FromBody] binds JSON to CreateTripRequest.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateTripRequest req)
         {
@@ -191,6 +228,7 @@ namespace CampusLift.API.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
+            // See [1] and [3]: .Insert(entity) issues INSERT ... RETURNING *.
             var inserted = await Sb.From<Trip>().Insert(trip);
             var created = inserted.Models.First();
 
@@ -205,6 +243,7 @@ namespace CampusLift.API.Controllers
         }
 
         // UPDATE
+        // See [4]: [HttpPatch] for partial updates.
         [HttpPatch("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTripRequest req)
         {
@@ -461,6 +500,7 @@ namespace CampusLift.API.Controllers
         // values and returns wall-clock DateTime with Kind=Unspecified.
         // Postgres stores timestamptz in UTC, so an Unspecified value from
         // that path is already UTC wall-clock — we just need to tag it.
+        // See [6]: DateTime.SpecifyKind is the mechanism used here.
         private static DateTime AsUtc(DateTime dt) => dt.Kind switch
         {
             DateTimeKind.Utc => dt,

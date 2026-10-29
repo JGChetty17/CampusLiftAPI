@@ -6,7 +6,8 @@ using CampusLift.API.Tests.Fixtures;
 using FluentAssertions;
 using Xunit;
 
-namespace CampusLift.API.Tests;
+namespace CampusLift.API.Tests
+    ;
 [Collection("Sequential")]
 public class VehiclesTests : BaseIntegrationTest
 {

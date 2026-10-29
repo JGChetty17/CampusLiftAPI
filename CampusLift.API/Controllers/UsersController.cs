@@ -1,4 +1,27 @@
-﻿using CampusLift.API.DTOs;
+﻿// =============================================================================
+// UsersController
+// -----------------------------------------------------------------------------
+// Handles user-related endpoints for the CampusLift API:
+//   - Sync user (called by Android after Firebase login)
+//   - Get current user ("me")
+//   - Update current user profile ("me")
+//
+// References:
+//   [1] Supabase C# API Reference — Introduction
+//       https://supabase.com/docs/reference/csharp/introduction
+//   [2] Supabase C# SDK — GitHub Repository
+//       https://github.com/supabase-community/supabase-csharp
+//   [3] Firebase Auth REST API
+//       https://firebase.google.com/docs/reference/rest/auth
+//   [4] Microsoft Learn — Create web APIs with ASP.NET Core
+//       https://learn.microsoft.com/aspnet/core/web-api/
+//   [5] Microsoft Learn — Binding source parameter inference
+//       https://learn.microsoft.com/aspnet/core/mvc/models/model-binding
+//
+// Author: CampusLift API
+// =============================================================================
+
+using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -6,12 +29,15 @@ using Supabase;
 
 namespace CampusLift.API.Controllers
 {
+    // See [4]: attribute routing for all endpoints in this controller.
     [Route("api/users")]
     public class UsersController : BaseApiController
     {
         public UsersController(Supabase.Client sb) : base(sb) { }
 
         // SYNC — called by Android after Firebase login
+        // See [3]: the Android client sends the Firebase UID obtained from sign-in.
+        // See [5]: [FromBody] binds JSON to SyncUserRequest.
         [HttpPost("sync")]
         public async Task<IActionResult> Sync([FromBody] SyncUserRequest req)
         {
@@ -33,6 +59,7 @@ namespace CampusLift.API.Controllers
                 UpdatedAt = DateTime.UtcNow
             };
 
+            // See [1] and [2]: .Insert(entity) issues INSERT ... RETURNING *.
             var inserted = await Sb.From<User>().Insert(user);
             return Ok(inserted.Models.First());
         }
@@ -46,6 +73,7 @@ namespace CampusLift.API.Controllers
         }
 
         // UPDATE PROFILE
+        // See [4]: [HttpPatch] for partial updates.
         [HttpPatch("me")]
         public async Task<IActionResult> Update([FromBody] UpdateUserRequest req)
         {
@@ -65,6 +93,7 @@ namespace CampusLift.API.Controllers
 
             user.UpdatedAt = DateTime.UtcNow;
 
+            // See [1]: .Update(entity) persists the modified row.
             var updated = await Sb.From<User>().Update(user);
             return Ok(updated.Models.First());
         }

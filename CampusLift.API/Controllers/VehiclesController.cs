@@ -1,4 +1,29 @@
-﻿using CampusLift.API.DTOs;
+﻿// =============================================================================
+// VehiclesController
+// -----------------------------------------------------------------------------
+// Handles vehicle-related endpoints for the CampusLift API:
+//   - List my vehicles
+//   - Get a vehicle by id
+//   - Create a vehicle
+//   - Update a vehicle
+//   - Delete a vehicle (blocked if used on an active trip)
+//
+// References:
+//   [1] Supabase C# API Reference — Introduction
+//       https://supabase.com/docs/reference/csharp/introduction
+//   [2] Supabase.Postgrest NuGet Package
+//       https://www.nuget.org/packages/Supabase.Postgrest
+//   [3] Supabase C# SDK — GitHub Repository
+//       https://github.com/supabase-community/supabase-csharp
+//   [4] Microsoft Learn — Create web APIs with ASP.NET Core
+//       https://learn.microsoft.com/aspnet/core/web-api/
+//   [5] Microsoft Learn — Binding source parameter inference
+//       https://learn.microsoft.com/aspnet/core/mvc/models/model-binding
+//
+// Author: CampusLift API
+// =============================================================================
+
+using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +32,7 @@ using Supabase.Postgrest;
 
 namespace CampusLift.API.Controllers
 {
+    // See [4]: attribute routing for all endpoints in this controller.
     [Route("api/vehicles")]
     public class VehiclesController : BaseApiController
     {
@@ -19,6 +45,7 @@ namespace CampusLift.API.Controllers
             var user = await CurrentUser();
             if (user == null) return Unauthorized("Unknown Firebase UID.");
 
+            // See [1]: From<Vehicle>().Where(...).Order(...).Get() query chain.
             var res = await Sb.From<Vehicle>()
                 .Where(v => v.UserId == user.Id)
                 .Order(v => v.CreatedAt, Constants.Ordering.Descending)
@@ -28,6 +55,7 @@ namespace CampusLift.API.Controllers
         }
 
         // GET BY ID
+        // See [4]: route constraint {id:guid} restricts the segment to GUIDs.
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -45,6 +73,7 @@ namespace CampusLift.API.Controllers
         }
 
         // CREATE
+        // See [5]: [FromBody] binds JSON to CreateVehicleRequest.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateVehicleRequest req)
         {
@@ -72,11 +101,13 @@ namespace CampusLift.API.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
+            // See [1] and [3]: .Insert(entity) issues INSERT ... RETURNING *.
             var inserted = await Sb.From<Vehicle>().Insert(vehicle);
             return Ok(inserted.Models.First());
         }
 
         // UPDATE
+        // See [4]: [HttpPatch] for partial updates.
         [HttpPatch("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVehicleRequest req)
         {
@@ -104,11 +135,13 @@ namespace CampusLift.API.Controllers
             }
             if (req.IsActive.HasValue) vehicle.IsActive = req.IsActive.Value;
 
+            // See [1]: .Update(entity) persists the modified row.
             var updated = await Sb.From<Vehicle>().Update(vehicle);
             return Ok(updated.Models.First());
         }
 
         // DELETE — refuse if the vehicle is on an active trip
+        // See [4]: [HttpDelete] with route constraint {id:guid}.
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -130,6 +163,7 @@ namespace CampusLift.API.Controllers
             if (activeTripsRes.Models.Any())
                 return Conflict("Cannot delete a vehicle used by an active trip. Cancel those trips first.");
 
+            // See [3]: .Delete(entity) issues a DELETE against the mapped table.
             await Sb.From<Vehicle>().Delete(vehicle);
             return NoContent();
         }
