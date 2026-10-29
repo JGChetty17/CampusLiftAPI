@@ -1,0 +1,63 @@
+name: API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'CampusLift.API/**'
+      - 'CampusLift.API.Tests/**'
+      - '.github/workflows/api-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'CampusLift.API/**'
+      - 'CampusLift.API.Tests/**'
+      - '.github/workflows/api-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run xUnit Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CampusLift.API.Tests/CampusLift.API.Tests.csproj
+
+      - name: Build
+        run: dotnet build CampusLift.API.Tests/CampusLift.API.Tests.csproj --no-restore -c Release
+
+      - name: Debug config values
+        env:
+          Supabase__Url: ${{ secrets.SUPABASE_URL }}
+          Supabase__Key: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "SUPABASE_URL secret is set: ${{ secrets.SUPABASE_URL != '' }}"
+          echo "SUPABASE_KEY secret is set: ${{ secrets.SUPABASE_KEY != '' }}"
+          echo "Env var Supabase__Url length: ${#Supabase__Url}"
+          echo "Env var Supabase__Key length: ${#Supabase__Key}"
+          cat CampusLift.API.Tests/appsettings.Testing.json | sed 's/"Key".*/"Key": "REDACTED"/'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: ./TestResults/*.trx
+
+      - name: Publish test summary
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: API Test Results
+          path: ./TestResults/*.trx
+          reporter: dotnet-trx
