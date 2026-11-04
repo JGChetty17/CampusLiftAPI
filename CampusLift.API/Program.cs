@@ -77,6 +77,7 @@ namespace CampusLift.API
 
             // Our FCM wrapper — singleton, safe to call even if Firebase isn't initialized
             builder.Services.AddSingleton<FcmService>();
+            builder.Services.AddSingleton<SupabaseStorageService>();
 
             // CORS for Android emulator / device
             builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
