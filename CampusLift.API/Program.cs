@@ -1,3 +1,6 @@
+﻿using CampusLift.API.Services;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using Supabase;
 
 namespace CampusLift.API
@@ -30,6 +33,51 @@ namespace CampusLift.API
 
             builder.Services.AddSingleton(supabase);
 
+            // ────────────────────────────────────────────────────────
+            // Firebase Admin — server-side FCM sender
+            // ────────────────────────────────────────────────────────
+            // Credentials are loaded from config key "Firebase:CredentialsJson"
+            // which must contain the FULL service-account JSON as a base64 string.
+            //
+            // Local dev:
+            //   dotnet user-secrets set "Firebase:CredentialsJson" "<base64>"
+            // GitHub Actions:
+            //   Secret FIREBASE_CREDENTIALS_BASE64 → env var Firebase__CredentialsJson
+            //
+            // If not configured, we skip init gracefully so the app still boots
+            // (useful in CI where you may not want to send pushes).
+            // ────────────────────────────────────────────────────────
+            var firebaseCredsB64 = builder.Configuration["Firebase:CredentialsJson"];
+            if (!string.IsNullOrWhiteSpace(firebaseCredsB64))
+            {
+                try
+                {
+                    var credsJson = System.Text.Encoding.UTF8.GetString(
+                        Convert.FromBase64String(firebaseCredsB64));
+
+                    if (FirebaseApp.DefaultInstance == null)
+                    {
+                        FirebaseApp.Create(new AppOptions
+                        {
+                            Credential = GoogleCredential.FromJson(credsJson)
+                        });
+                    }
+
+                    Console.WriteLine("[Firebase] Admin SDK initialized successfully.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Firebase] WARNING: failed to initialize Admin SDK: {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[Firebase] WARNING: 'Firebase:CredentialsJson' not set — FCM will be skipped.");
+            }
+
+            // Our FCM wrapper — singleton, safe to call even if Firebase isn't initialized
+            builder.Services.AddSingleton<FcmService>();
+
             // CORS for Android emulator / device
             builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
                 p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
@@ -45,9 +93,8 @@ namespace CampusLift.API
             app.UseCors();
             app.MapControllers();
 
-            app.Run();
+            app.Run("http://0.0.0.0:5056");
         }
     }
-    
 }
 public partial class Program { }

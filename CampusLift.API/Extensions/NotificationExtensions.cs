@@ -1,18 +1,24 @@
 ﻿using CampusLift.API.Models;
+using CampusLift.API.Services;
 using Supabase;
 
 namespace CampusLift.API.Extensions
 {
     public static class NotificationExtensions
     {
-        // Writes a row to the notifications table.Failures are swallowed never break the caller because a notification insert died.
+        /// <summary>
+        /// Writes a notification row AND sends an FCM push (if FcmService is provided).
+        /// Failures are swallowed — never break the caller.
+        /// </summary>
         public static async Task CreateNotification(
             this Supabase.Client sb,
             Guid userId,
-            string type,      
+            string type,
             string title,
-            string message)
+            string message,
+            FcmService? fcm = null)        // ← optional param, back-compatible
         {
+            // 1. Persist to notifications table (existing behaviour)
             try
             {
                 var n = new Notification
@@ -29,6 +35,15 @@ namespace CampusLift.API.Extensions
             catch
             {
                 // intentionally swallowed
+            }
+
+            // 2. Fire FCM push (new) — only if FcmService injected
+            if (fcm != null)
+            {
+                await fcm.SendToUserAsync(userId, title, message, new Dictionary<string, string>
+                {
+                    { "type", type }
+                });
             }
         }
     }
