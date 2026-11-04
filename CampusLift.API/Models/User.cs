@@ -7,7 +7,6 @@ namespace CampusLift.API.Models
     public class User : BaseModel
     {
         [PrimaryKey("id", false)] public Guid Id { get; set; }
-
         [Column("firebase_uid")] public string FirebaseUid { get; set; } = string.Empty;
         [Column("email")] public string? Email { get; set; }
         [Column("name")] public string? Name { get; set; }
@@ -21,6 +20,7 @@ namespace CampusLift.API.Models
         [Column("dark_mode")] public bool DarkMode { get; set; }
         [Column("biometric_enabled")] public bool BiometricEnabled { get; set; }
         [Column("notification_enabled")] public bool NotificationEnabled { get; set; }
+        [Column("fcm_token")] public string? FcmToken { get; set; }   // ← NEW
         [Column("created_at")] public DateTime CreatedAt { get; set; }
         [Column("updated_at")] public DateTime UpdatedAt { get; set; }
     }

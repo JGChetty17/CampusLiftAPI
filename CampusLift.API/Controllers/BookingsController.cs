@@ -41,7 +41,11 @@ namespace CampusLift.API.Controllers
     [Route("api/bookings")]
     public class BookingsController : BaseApiController
     {
-        public BookingsController(Supabase.Client sb) : base(sb) { }
+        private readonly CampusLift.API.Services.FcmService _fcm;
+        public BookingsController(Supabase.Client sb, CampusLift.API.Services.FcmService fcm) : base(sb)
+        {
+            _fcm = fcm;
+        }
 
         // CREATE BOOKING (passenger) — atomic via book_seat RPC
         // See [5]: [FromBody] binds the JSON payload to CreateBookingRequest.
@@ -92,7 +96,7 @@ namespace CampusLift.API.Controllers
                         trip.DriverId,
                         "booking",
                         "New booking request",
-                        $"{user.Name} {user.Surname} wants to book {req.SeatsRequested} seat(s) on your trip.");
+                        $"{user.Name} {user.Surname} wants to book {req.SeatsRequested} seat(s) on your trip.",_fcm);
                 }
 
                 return Ok(booking);
@@ -195,7 +199,7 @@ namespace CampusLift.API.Controllers
                 req.Approve ? "Booking approved" : "Booking rejected",
                 req.Approve
                     ? "Your booking has been approved. See you on the trip!"
-                    : "Your booking request was rejected by the driver.");
+                    : "Your booking request was rejected by the driver.",_fcm);
 
             return Ok(updated.Models.First());
         }
@@ -238,7 +242,7 @@ namespace CampusLift.API.Controllers
                     booking.PassengerId,
                     "booking",
                     "Booking cancelled",
-                    "The driver has cancelled your booking.");
+                    "The driver has cancelled your booking.",_fcm);
             }
             else if (isPassenger)
             {
@@ -251,7 +255,7 @@ namespace CampusLift.API.Controllers
                         trip2.DriverId,
                         "booking",
                         "Booking cancelled",
-                        $"{user.Name} {user.Surname} cancelled their booking on your trip.");
+                        $"{user.Name} {user.Surname} cancelled their booking on your trip.",_fcm);
                 }
             }
 

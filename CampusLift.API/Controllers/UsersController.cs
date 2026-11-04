@@ -25,6 +25,7 @@ using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
 using Microsoft.AspNetCore.Mvc;
+using CampusLift.API.Services;
 using Supabase;
 
 namespace CampusLift.API.Controllers
@@ -96,6 +97,38 @@ namespace CampusLift.API.Controllers
             // See [1]: .Update(entity) persists the modified row.
             var updated = await Sb.From<User>().Update(user);
             return Ok(updated.Models.First());
+        }
+        // REGISTER FCM TOKEN — called by Android after Firebase sign-in
+        [HttpPost("me/fcm-token")]
+        public async Task<IActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenRequest req)
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized("Unknown Firebase UID.");
+
+            if (string.IsNullOrWhiteSpace(req.Token))
+                return BadRequest("Token is required.");
+
+            user.FcmToken = req.Token.Trim();
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await Sb.From<User>().Update(user);
+
+            return Ok(new { message = "FCM token registered." });
+        }
+
+        // UNREGISTER FCM TOKEN — called by Android on sign-out
+        [HttpDelete("me/fcm-token")]
+        public async Task<IActionResult> UnregisterFcmToken()
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized("Unknown Firebase UID.");
+
+            user.FcmToken = null;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await Sb.From<User>().Update(user);
+
+            return Ok(new { message = "FCM token cleared." });
         }
     }
 }
