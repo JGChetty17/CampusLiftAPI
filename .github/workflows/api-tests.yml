@@ -46,6 +46,17 @@ jobs:
           echo "Env var Supabase__Url length: ${#Supabase__Url}"
           echo "Env var Supabase__Key length: ${#Supabase__Key}"
           cat CampusLift.API.Tests/appsettings.Testing.json | sed 's/"Key".*/"Key": "REDACTED"/'
+          
+      - name: Run API tests
+        env:
+          Supabase__Url: ${{ secrets.SUPABASE_URL }}
+          Supabase__Key: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          dotnet test CampusLift.API.Tests/CampusLift.API.Tests.csproj \
+            --no-build \
+            -c Release \
+            --logger "trx;LogFileName=api-tests.trx" \
+            --results-directory ./TestResults
 
       - name: Upload test results
         if: always()
