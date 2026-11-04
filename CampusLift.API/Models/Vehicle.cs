@@ -16,5 +16,6 @@ namespace CampusLift.API.Models
         [Column("seats")] public int Seats { get; set; }
         [Column("is_active")] public bool IsActive { get; set; } = true;
         [Column("created_at")] public DateTime CreatedAt { get; set; }
+        [Column("image_url")] public string? ImageUrl { get; set; }
     }
 }

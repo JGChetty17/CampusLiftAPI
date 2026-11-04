@@ -26,9 +26,11 @@
 using CampusLift.API.DTOs;
 using CampusLift.API.Extensions;
 using CampusLift.API.Models;
+using CampusLift.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Supabase;
 using Supabase.Postgrest;
+
 
 namespace CampusLift.API.Controllers
 {
@@ -36,7 +38,12 @@ namespace CampusLift.API.Controllers
     [Route("api/vehicles")]
     public class VehiclesController : BaseApiController
     {
-        public VehiclesController(Supabase.Client sb) : base(sb) { }
+        private readonly SupabaseStorageService _storage;
+        
+        public VehiclesController(Supabase.Client sb, SupabaseStorageService storage) : base(sb)
+        {
+            _storage = storage;
+        }
 
         // LIST MY VEHICLES
         [HttpGet]
@@ -167,5 +174,113 @@ namespace CampusLift.API.Controllers
             await Sb.From<Vehicle>().Delete(vehicle);
             return NoContent();
         }
+        [HttpPost("{id:guid}/image")]
+        [RequestSizeLimit(5 * 1024 * 1024)]  // 5MB
+        public async Task<IActionResult> UploadImage(Guid id, [FromForm] IFormFile? file)
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized("Unknown Firebase UID.");
+
+            if (file == null || file.Length == 0)
+                return BadRequest("No file was uploaded.");
+
+            if (file.Length > 5 * 1024 * 1024)
+                return BadRequest("File size must not exceed 5MB.");
+
+            // Verify the vehicle belongs to the current user
+            var vehicleRes = await Sb.From<Vehicle>()
+                .Where(v => v.Id == id && v.UserId == user.Id)
+                .Limit(1)
+                .Get();
+            var vehicle = vehicleRes.Models.FirstOrDefault();
+            if (vehicle == null) return NotFound("Vehicle not found or not owned by you.");
+
+            // Read the file into memory and validate magic bytes
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+
+            var (isValid, contentType, ext) = SupabaseStorageService.ValidateImage(bytes, file.FileName);
+            if (!isValid)
+                return BadRequest("File is not a valid image. Allowed formats: JPEG, PNG, WebP.");
+
+            // Upload to Supabase Storage
+            string objectPath;
+            try
+            {
+                objectPath = await _storage.UploadVehicleImageAsync(id, bytes, contentType, ext);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Upload] Failed: {ex.Message}");
+                return StatusCode(500, "Failed to upload image.");
+            }
+
+            // Save the object path (not the URL) in the DB — we generate signed URLs on read
+            vehicle.ImageUrl = objectPath;
+            await Sb.From<Vehicle>().Update(vehicle);
+
+            // Return a signed URL for immediate preview
+            var signedUrl = await _storage.GetSignedUrlAsync(objectPath);
+
+            return Ok(new
+            {
+                message = "Image uploaded successfully.",
+                vehicleId = id,
+                imagePath = objectPath,
+                signedUrl
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // NEW: Get a fresh signed URL for the vehicle image
+        // ═══════════════════════════════════════════════════════════
+        [HttpGet("{id:guid}/image")]
+        public async Task<IActionResult> GetImage(Guid id)
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized("Unknown Firebase UID.");
+
+            var vehicleRes = await Sb.From<Vehicle>()
+                .Where(v => v.Id == id && v.UserId == user.Id)
+                .Limit(1)
+                .Get();
+            var vehicle = vehicleRes.Models.FirstOrDefault();
+            if (vehicle == null) return NotFound("Vehicle not found.");
+            if (string.IsNullOrEmpty(vehicle.ImageUrl))
+                return NotFound("Vehicle has no image.");
+
+            var signedUrl = await _storage.GetSignedUrlAsync(vehicle.ImageUrl);
+            if (signedUrl == null)
+                return StatusCode(500, "Failed to generate signed URL.");
+
+            return Ok(new { vehicleId = id, signedUrl });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // NEW: Delete vehicle image (keeps the vehicle)
+        // ═══════════════════════════════════════════════════════════
+        [HttpDelete("{id:guid}/image")]
+        public async Task<IActionResult> DeleteImage(Guid id)
+        {
+            var user = await CurrentUser();
+            if (user == null) return Unauthorized("Unknown Firebase UID.");
+
+            var vehicleRes = await Sb.From<Vehicle>()
+                .Where(v => v.Id == id && v.UserId == user.Id)
+                .Limit(1)
+                .Get();
+            var vehicle = vehicleRes.Models.FirstOrDefault();
+            if (vehicle == null) return NotFound("Vehicle not found.");
+            if (string.IsNullOrEmpty(vehicle.ImageUrl))
+                return NotFound("Vehicle has no image.");
+
+            await _storage.DeleteAsync(vehicle.ImageUrl);
+            vehicle.ImageUrl = null;
+            await Sb.From<Vehicle>().Update(vehicle);
+
+            return Ok(new { message = "Image deleted." });
+        }
     }
 }
+    
