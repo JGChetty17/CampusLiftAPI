@@ -174,9 +174,12 @@ namespace CampusLift.API.Controllers
             await Sb.From<Vehicle>().Delete(vehicle);
             return NoContent();
         }
+        // UPLOAD VEHICLE IMAGE
+        // See [5]: IFormFile binds from the multipart form automatically, so no [FromForm] is needed (Swagger can't handle it).
         [HttpPost("{id:guid}/image")]
+        [Consumes("multipart/form-data")]
         [RequestSizeLimit(5 * 1024 * 1024)]  // 5MB
-        public async Task<IActionResult> UploadImage(Guid id, [FromForm] IFormFile? file)
+        public async Task<IActionResult> UploadImage(Guid id, IFormFile? file)
         {
             var user = await CurrentUser();
             if (user == null) return Unauthorized("Unknown Firebase UID.");
