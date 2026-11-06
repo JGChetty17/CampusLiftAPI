@@ -29,7 +29,8 @@ namespace CampusLift.API
             };
 
             var supabase = new Supabase.Client(url, key, options);
-            await supabase.InitializeAsync();
+            try { await supabase.InitializeAsync(); }
+            catch (Exception ex) { Console.WriteLine($"[Supabase] init failed: {ex.Message}"); }
 
             builder.Services.AddSingleton(supabase);
 
@@ -94,7 +95,8 @@ namespace CampusLift.API
             app.UseCors();
             app.MapControllers();
 
-            app.Run("http://0.0.0.0:5056");
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "5056";
+            app.Run($"http://0.0.0.0:{port}");
         }
     }
 }
