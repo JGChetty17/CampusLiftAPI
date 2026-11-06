@@ -361,3 +361,24 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# =============================================================================
+# CampusLift — Secrets and Environment Files
+# NEVER commit these. They contain credentials.
+# =============================================================================
+
+# Local environment config with real keys
+**/appsettings.Testing.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+
+# Firebase service account JSON (server-side credential)
+**/firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
+
+# Base64-encoded Firebase credentials
+**/*.b64
+
+# Rendered example templates should be committed
+!**/appsettings.Testing.example.json
+!**/appsettings.Development.example.json
